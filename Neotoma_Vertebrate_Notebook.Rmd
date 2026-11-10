@@ -1,0 +1,735 @@
+---
+title: "Neotoma Vertebrate Data Analyses in R"
+author: 
+- "Jessica Blois, UCLA"
+- "Melissa Pardi, Illinois State Museum"
+output:
+  html_document: 
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T,
+                      results = "hide",
+                      fig.show = "hide",
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+```{r echo=F, results=F}
+# instructor notes: 
+
+# have students open up R Studio
+# have students open up a new R script or R markdown doc, depending on preference
+# have students open up the "Neotoma_Vertebrate_Notebook.html" file
+```
+
+
+# Introduction
+This notebook aims to provide some examples for performing  several common analyses in vertebrate paleontology using the [Neotoma Paleoecology Database](https://www.neotomadb.org/). Through this tutorial, our hope is that you will become more common with vertebrate data in Neotoma and how they are stored.
+
+We will perform two basic tasks:
+
+1. Download vertebrate assemblage data from a single site and calculate assemblage diversity through time
+2. Download data from a single species and generate simple distribution maps.
+
+Along the way, we will explain different features of the Neotoma data model and different points where users will need to make decisions - about taxonomy, chronologies, etc.
+
+# Workshop Overview
+* 8 - 9am Welcome and Introduction to Neotoma
+* 9 - 12:30pm Working with R
+    * 9 - 10:30am Analysing diversity
+    * 10:30 - 11am Coffee break
+    * 11 - 12:30pm Generating a simple distribution map
+* 12:30 - 1:30pm Lunch on your own
+* 1:30 - 2:15pm Individual coding time
+* 2:15 - 3pm Report backs and wrap up
+
+
+# Introduction to Neotoma Paleoecology Database
+
+## History
+The [Neotoma Paleoecology Database](https://www.neotomadb.org/) originated in 2008, but the history of aggregating vertebrate data into databases is much older. The vertebrate data in Neotoma originated from an effort called 'FAUNMAP', which was a [large research effort](https://doi.org/10.1126/science.272.5268.1601) and [database project](https://www.museum.state.il.us/research/faunmap/aboutfaunmap.html) in the 1990s organized by Russ Graham and Ernie Lundelius. The goal was to pull together data from Quaternary vertebrate fossils sites in North America and examine 'disharmonious' or 'non-analog' assemblages. They pulled together regional experts who identified fossil localities from the literature and gray literature that should be added to the database, then created a database that recorded the records of taxa at individual sites across the Quaternary, along with any information on the age of the locality. This effort created the database called 'FAUNMAP'.
+
+Then, in 2008, FAUNMAP was integrated with the North American Pollen Database and others to form the Neotoma Paleoecology Database, which originally was focused primarily on Quaternary sites across many different proxy types. Over the years, Neotoma has been modified, so it now stores a ton of different kinds of paleoecological and paleoenvironmental data from around the world.
+
+Another related database formed during this era was the [Paleobiology Database](https://paleobiodb.org/#/). Vertebrate data shows up in both PBDB and in Neotoma, so what's the difference? For the Quaternary, there is a decent amount of overlap, but they don't store the exact data. And, there are structural differences in the database - PBDB is occurrence based, whereas Neotoma is site based (largely), so this means that they have different strengths. Neotoma does a better job at describing time, PBDB does a better job for taxonomy. We have been making improvements to Neotoma so that it can better store specimen-level data, but the original focus on the site as the primary unit affects aspects of searching for data, as we'll see.
+
+## About Neotoma's Data Structure
+Neotoma's core data structure is focused on the site. The data structure is summarized [here](https://cran.r-project.org/web/packages/neotoma2/vignettes/neotoma2-package.html). Let's take a look at some of the terminology.
+  * Site
+  * Collection unit
+  * Analysis unit
+  * Samples
+  * Dataset: all of the samples of the same proxy type across the collection unit
+
+## The Neotoma ecosystem
+
+### APIs
+What is an API? API stands for 'Application Programming Interface'. It allows different applications to connect with one another. i.e., a broswer like Chrome, the R program, or the Tilia software all connect with the Neotoma database through APIs. Each API 'endpoint' provides a shortcut to do a task, like search for sites with certain parameters.
+
+Neotoma's APIs are documented and stored [here](https://api.neotomadb.org/api-docs/). We also have a separate set of APIs to interface with the Tilia program, which we will use in Part 2 of the R workshop. I typically find out about these endpoints via the Tilia program itself.
+
+
+### Explorer
+
+Neotoma's [Explorer app](https://apps.neotomadb.org/explorer/) is an easy way to do an initial exploration of sites. On that app, you can choose "dataset type = vertebrate fauna", the filter by space or time. you can also search for taxon occurrences. Searching by taxon is a bit clunky (due to features of how Neotoma handles taxa and also features of steward capacity, which will be discussed in Objective 2), but you can generally build up a search across multiple different taxa. 
+
+### Tilia
+
+You can also use Neotoma's specialized software [Tilia](https://www.neotomadb.org/apps/tilia) to search for sites and then examine site data. Tilia has a slower learning curve but is also the most comprehensive. Tilia is freely available to download and use, albeit only available to use on PCs. Tilia is also used to upload data to Neotoma, for which you need training and login privileges. Talk to a [data steward](https://www.neotomadb.org/people) (such as Jessica Blois for vertebrate data) if you are interested in learning more about Tilia.
+
+### R package
+We will get to know much more about the R package soon!
+
+### DataBUS
+
+We aren't going to cover this here, but we have also developed a system for bulk-uploading data to Neotoma called DataBUS (Data Bulk Upload System). This bypasses the Tilia software and uses scripts and the APIs directly to do the uploads and is best if you are uploading a large amount of structured data into Neotoma.
+
+## Other Neotoma resources
+
+You can explore various [Neotoma resources](https://www.neotomadb.org/resources) on the Neotoma website. Some of the ones that may be the most useful include: 
+
+  * [Schema](https://open.neotomadb.org/dbschema/)
+  * [Neotoma Manual](https://open.neotomadb.org/manual/)
+  * [Workshops](https://cran.r-project.org/web/packages/neotoma2/vignettes/neotoma2-package.html). There are a variety of example workshops and code linked at the bottom of the R vignette. 
+
+
+# Using the Neotoma R package to analyse vertebrate data
+
+## Getting started with R
+OK, I assume everyone has both R and R Studio installed.
+
+First, we'll need to get your R workspace set up for running analyses. The R environment is built on various specialized packages. The Neotoma IT team has created an R package ['neotoma2'](https://cran.r-project.org/web/packages/neotoma2/index.html) that allows users to access data from Neotoma directly. So you'll need to install that package and then load it into your workspace. 
+
+In addition, along the way we will manipulate and plot data in various ways. The ['tidyverse'](https://cran.r-project.org/web/packages/tidyverse/index.html) family of packages is very useful for these tasks.
+
+Once we install packages onto our machine, we need to make them available in this specific workspace using the 'require()' function.
+```{r install_initial_packages}
+
+# uncomment and use this code and modify the package name if you need to install any packages
+# install.packages(c('neotoma2', 'tidyverse')) 
+
+# once packages are installed to your local machine, you will need to call them into your current environment:
+require(neotoma2)
+require(tidyverse)
+
+```
+
+
+# Objective 1: Assemblage diversity through time
+
+One common objective of many vertebrate paleobiology analyses is to analyze diversity of a site or compare the diversity among several sites through time.  Let's look at one classic small mammal site, Samwell Cave, that spans the Pleistocene from the Last Glacial Maximum into the Holocene and examine temporal patterns of diversity change at this site.
+
+Here, we have chosen a specific site for the purposes of this tutorial. But if you don't know which sites you want to look at or if you want to look at many sites within a region, how do you find sites? 
+
+OK, first, we'll be doing some analyses that require other specialized packages: community diversity analyses and spatial analyses. Let's install the  community analysis package, 'vegan', that we will need for this Objective. 
+```{r install_Obj1_packages}
+
+# use this code and modify the package name if you need to install any packages
+
+# install.packages('vegan') 
+require(vegan)
+
+```
+
+## Find sites - 'neotoma2' R package
+
+You can also search for sites using R. This is what we will be using in this workshop. 
+
+First, take a look at the help menu for the 'get_sites' function in R to see what values can be passed as inputs:
+```{r site_search_help}
+# this command takes you to the help menu for the 'get_sites' function.
+?get_sites  
+```
+
+
+### General site search
+
+Now that we've examined help, let's search for vertebrate fauna sites coming from several states in the west (*California, Oregon, Washington*) and let's restrict it to sites that have at least some late Pleistocene (*say, 15,000 years bp*) stratigraphic units (called 'analysis units' in Neotoma).
+```{r site_search_example}
+
+site_search <- get_sites(
+  datasettype = "vertebrate fauna",
+  gpid = paste(c('California', 'Oregon', 'Washington'), collapse = ","),
+  ageof = 15000, all_data=T)
+
+site_search
+
+```
+What is returned is an overview of the sites - the site name and id, as well as latitude, longitude, and altitude. The sites object stores a limited amount of additional data associated with the site.
+
+Let's look at the first site. You can see what other attributes are stored with the sites by using the *str* command or adding the *$* to the end of the site index:
+```{r examine_str_sites_objects}
+# str is the most complete:
+str(site_search[[1]])
+
+# note: examine the different fields in the site object
+```
+
+You can then use that data object structure to examine a particular field
+```{r examine_specific_sites_objects}
+# add the $ to the end, then choose which value to examine 
+
+site_search[[1]]$notes # recovers any notes associated with a site
+site_search[[1]]$collunits # recovers the collection units associated with a site
+```
+
+## Examine Samwell Cave
+
+OK, so that is one way to search sites. Let's say you know which exact site you want to analyse. Let's pull down the data for just that site.
+```{r site_search_samwell}
+
+Samwell <- get_sites(sitename = 'Samwell Cave') 
+Samwell # check to see what the search returned
+
+# Note, if you don't know the exact name, you can add a % for partial matching, e.g., Samwell%
+
+```
+
+### Get full site information
+
+OK, we got the right site, Samwell Cave. 
+
+The 'get_sites' function in Neotoma is a quick way to search for sites, but it does not provide complete information on each site. Now that we have our site object saved, we need to pull down ALL of the data associated with the site. For this, we use the 'get_downloads' function. We can apply this to the object containing our Samwell Cave site:
+```{r site_download}
+vertDownload <- get_downloads(Samwell) 
+vertDownload
+```
+
+
+This doesn't really look much different than the result of the 'get_sites' command, so let's dig into the structure to see what's changed. 
+
+*Note, I have hidden the full structure in the html document, but you can view it in your code.
+```{r examineDownloads, results = 'hide'}
+str(vertDownload)
+```
+
+There is a lot to see here! It's too much to take in, but this does give you an idea of the complexity of the data model and how much data is actually stored for each site in Neotoma. 
+
+### Examine the full set of information at Samwell Cave
+
+#### Examine collection units
+
+One thing we can do is see if there are multiple different 'Collection Units' within the sites. For example, there may be several distinct locations within a cave that were excavated. Depending on how the authors choose to organize their data, these locations could be considered separate 'Collection Units'. At Samwell Cave, for example, there are four different collection units: SAMWELL, SAMWELL1, SAMWELL2, and SCPD. 
+```{r examineDownloads_collunits}
+# Two ways to look at the collection units
+
+collunits(vertDownload)
+vertDownload$collunits
+```
+
+We want to focus on SCPD, which is the focus of excavations done by Jessica Blois in the 2000s. So, examine the result of the code in the last code chunk. What element/row is the SCPD dataset? For me, it was #3, so I set the object 'scpdCollUnit' equal to 3 in the chunk below. But you may need to use a different element number
+```{r set_scpd}
+scpdCollUnit <- 3 
+# use a number here if you know the specific collection unit you want to look at (in this case, SCPD, which corresponds to the third element in this data object). But if the collunits are in a different order for you, replace '3' with the correct number for your object.
+```
+
+#### Examine datasets
+
+Let's look at other aspects of the site. First, let's examine the datasets associated with each collection unit. There are again two ways to do this:
+1. use the 'datasets' function to show all the datasets associated with the site
+2. use an index for the collection units to examine the datasets for a specific collunit. 
+```{r examineSamwell_datasets}
+# examine all the datasets at a site
+datasets(vertDownload)  # this function shows all the datasets, but here it's unclear which Collection Units they are associated with. In general, this is a 'late Quaternary' site
+
+# retrieve the datasets specifically for SCPD
+datasets(vertDownload[[1]]@collunits@collunits[[scpdCollUnit]]) 
+```
+
+#### Examine chronologies
+
+Now, let's take a look at the chronologies, again using these two methods to get an overview or dig into a specific collection unit.
+```{r examineSamwell_chronologies}
+# let's look at the chronologies associated with each dataset:
+chronologies(vertDownload)
+chronologies(vertDownload[[1]]@collunits@collunits[[scpdCollUnit]]) # this line of code is if you know the specific collection unit you want to look at (in this case, SCPD)
+```
+
+#### Examine samples (taxa)
+
+Finally, let's take a look at the actual samples found at the site, first getting the overview of ALL samples at the site.
+```{r examineSamwell_samples}
+
+# finally, let's examine the samples. Let's save these as separate objects
+allSamples <- samples(vertDownload) # samples for all datasets
+allSamples # a lot of data! 
+
+# what if we want to examine a specific chronology? 
+
+# allSamplesSyvBounds <- samples(vertDownload, chronname = 'Syverson-Blois: bounds') # samples for all datasets
+# allSamplesSyvBounds
+```
+
+## Examine Samwell Cave (SCPD) diversity through time
+
+### Get SCPD samples
+
+OK, now that we have a better sense of what is available, let's download samples for the specific collection unit (SCPD) and a specific chronology (Blois et al. 2010) 
+```{r get_SCPD_data}
+# download and store all the samples for the SCPD collection unit
+scpdSamples <- samples(vertDownload[[1]]@collunits@collunits[[scpdCollUnit]], chronname = 'Blois et al. 2010') 
+scpdSamples
+view(scpdSamples) # for complicated tables, the view() function may be an easier way to examine the data
+```
+
+### Calculate and visualize SCPD diversity
+
+OK, now that we have the data, we have to do some data cleaning and rearranging to make it suitable for diversity analyses.
+
+We want a table that is essentially a 'site x taxa' table, or since this is paleo data, a 'time x taxon' table.
+
+In this case, the column *analysisunitid* represents the unique ID of each stratigraphic unit. I find it helpful to actually construct two sets of tables:
+
+  * chronology table (analysis unit name and/or depth x time)
+  * taxon table (analysis unit name and/or depth x taxa)
+
+The first thing to do is figure out the unique analysis units (stratigraphic units) and unique taxa, and check to see if there are different kinds of units (NIPS, MNI, P/A) available for different taxa:
+```{r arrange_SCPD_data_1}
+scpdUnits <- distinct(scpdSamples[,c('analysisunitid', 'age', 'ageolder', 'ageyounger')])
+scpdUnits
+
+scpdTaxa <- unique(scpdSamples[,'variablename'])  
+scpdTaxa
+
+# check units: are there NISP, MNI, presence?
+unique(scpdSamples$units) #just NISP for this dataset
+```
+
+
+Then, create the main dataframe and get it arranged for diversity analyses
+```{r arrange_SCPD_data_2}
+
+# create SCPD dataframe
+scpdData <- pivot_wider(scpdSamples, id_cols = c('analysisunitid'), names_from = 'variablename', values_from = 'value')
+view(scpdData) 
+
+# arrange for 'vegan' package
+scpdDataAnalysis <- scpdData[,-1]
+scpdDataAnalysis <- replace(scpdDataAnalysis, is.na(scpdDataAnalysis), 0)
+view(scpdDataAnalysis) #same table, but with analysis units column removed
+
+```
+
+Calculate diversity two different ways and plot diversity
+```{r calcDiv}
+# Calculate diversity
+
+richness <- specnumber((scpdDataAnalysis))
+shannonDiv <- diversity(scpdDataAnalysis, index = "shannon")
+
+plot(richness, type="l")
+plot(shannonDiv, type="l")
+```
+
+These plots are ok, but they are not very pretty or informative without proper axes. Let's make them nicer.
+```{r plot_SCPD_diversity}
+
+# arrange diversity data with age
+divDat <- cbind(scpdUnits[, c('analysisunitid', 'age')], scpdData[,'analysisunitid'], richness, shannonDiv)
+divDat
+
+  # Question: why did I repeat analysisunitid in the above line of code?
+
+# let's get rid of one of the repeated columns
+divDat <- divDat[,-1]
+
+divDat <- divDat %>% 
+  select(analysisunitid, age, richness, shannonDiv) %>%
+  arrange(desc(age))
+
+# make pretty
+plot(richness ~ age, data=divDat, type= "l")
+plot(shannonDiv ~ age, data=divDat, type= "l")
+```
+
+### Objective 1 Wrap up
+OK, if we wanted to completely replicate the analyses in Blois et al. 2010, we would need to focus on taxa from the same guild, small mammals, defined in the paper as taxa in the orders Rodentia and Eulipotyphla. But we'll skip that for now - it mainly would require adding a filtering step for the taxa, before we calculate richness and Shannon diversity.
+
+**Question for the group: What other community/assemblage level analyses would you like to do?**
+
+# Objective 2: Species ranges
+
+The second objective of the workshop is to use Neotoma to plot species ranges. Many analyses will perform species distribution modeling to model species ranges, but that's outside the scope of a 1-day workshop. Instead, we will focus on a very simplified version of a species range - a convex hull around species occurrences.
+
+Let's work with a common late Quaternary taxon, *Bison*. A recent paper by [Wendt et al.](http://dx.doi.org/10.1016/j.quascirev.2022.107472) examined the range of the extant *Bison bison* (or *Bos bison* according to the revised *Bison* taxonomy from [MDD](https://www.mammaldiversity.org/taxon/1006256/)) through the Holocene and latest Pleistocene.
+
+The first step is to download all potential occurrences of *Bison bison* from Neotoma. This is actually an incredibly frustrating step to do in Neotoma, due to two features (or bugs, depending on your perspective) of Neotoma's data structure. 
+
+1. As described above, Neotoma is organized around sites, and more specifically, datasets. This structure originated from the original focus of Neotoma on assemblages (from the North American Pollen Database and FAUNMAP). This is different than, e.g., the [Paleobiology Database](https://paleobiodb.org/#/), which is organized around occurrences. What this means is that to drill down into an individual occurrence, you have to go through sites.
+2. Neotoma stores the original taxon names for each site from the authors, with some synonymys in places. However, taxon names are not automatically updated with changes in taxonomy and many original identifications had some amount of uncertainty in them. Consequently, once we get all the potential occurrences of *Bison bison* across sites, we need to do some data cleaning to come up with the most appropriate set of occurrences for our range analysis.
+
+## Learn more about Neotoma's vertebrate taxonomy
+
+### 'get_taxon' function and wildcard searches
+We can examine individual taxa names using the 'get_taxon' function. This returns the taxonid, which is helpful for downstream searches.
+
+Let's first do a wild-card search, to find all the different taxon names in which the word *Bison* appears
+```{r find_bison_taxa}
+a <- get_taxon(taxonname = 'Bison*') # The * adds the wildcard. Here, it's placed at the end.
+a
+
+b <- get_taxon(taxonname = '*Bison') # The * adds the wildcard. Here, it's placed at the beginning. 
+b
+
+c <- get_taxon(taxonname = '*Bison*') # The * adds the wildcard. Here, it's placed at both the beginning and the end. 
+c
+```
+
+You can see that a slightly different set of taxa appear with the three different searches, with unclear overlap. Let's combine searches and narrow in on the set of taxa we really want to work with
+```{r create_combined_bison_df}
+# combine a,b,c, into one list of taxa
+  # for some reason, I got errors when combining three lists at once, so I did it in two steps
+d <- c(a,b) 
+bison_combined <- c(c,d) 
+
+# the output from 'get_taxon' is a list, so let's convert it to a dataframe so it's easier to work with and view
+bison_combined_df <- as.data.frame(bison_combined)
+head(bison_combined_df)
+view(bison_combined_df)
+# examine the dataframe, explain all the columns, etc
+
+```
+
+Now, let's find and remove duplicated taxon names, as well as non-mammals, and view the dataframe
+```{r remove_dup_names}
+bison_unique <- bison_combined_df %>%
+  distinct(taxoncode, .keep_all = TRUE) %>%
+  filter(taxagroupid == 'MAM')
+view(bison_unique)
+```
+
+Let's examine these names in depth.  **Question: What do you notice about them?**
+```{r echo=F, results=F}
+# instructor notes: discuss uncertainty in taxon names. cf, ?, weird combinations of them all.
+# Note that extant *Bison* have been reclassified as *Bos*
+# Note that rows where the taxoncode is in brackets, e.g. [Bis.al], indicate taxa that were synonymized. So they appear in the taxon list but names have been replaced in datasets (storing the original name)
+```
+
+### Choose final *Bison* taxa to search for within Neotoma
+
+OK, let's choose the final taxa we actually want to include in our species distribution maps. For this, we need to know the full set of Neotoma names that we want to include, and also make some decisions about how comfortable we are with taxonomic uncertainty. 
+
+This feels like a good target set of taxon names to include:
+
+  * *Bison bison*
+  * cf. *Bison bison*
+  * *?Bison bison*
+  * *Bison bison athabascae*
+  * *Bison bison bison*
+  * *Bos bison* and its variants
+ 
+We also know that there have been a lot of taxonomy revisions since data were originally added to Neotoma. Some, but not all, of the invalid names have been handled/synonymized in Neotoma; thus, some of the names in Neotoma are not valid. What should we do?
+
+Well, a group of us have been working on taxonomy updates for Neotoma, and while the whole list of mammals is not ready, we have revised the Artiodactyls. So let's import a spreadsheet of revised taxonomic names for *Bison*/*Bos*.
+
+
+```{r read_external_bison_taxonomy}
+bisonTaxa <- read.delim('data/neotoma_taxa_updates_Bovinae.txt', sep="\t", header=T)
+head(bisonTaxa) #examine the dataframe
+```
+
+Most of the columns in this dataframe are not useful at this stage. The key columns are:
+
+  * taxonid --> the taxon id number stored in Neotoma
+  * taxonname --> the taxon name stored in Neotoma
+  * proposedName --> what the valid current name of the taxon should be
+  
+Let's use the 'proposedName' column in the spreadsheet to figure out which Neotoma taxa should be included in our search.
+```{r proposedName}
+unique(bisonTaxa$proposedName)
+```
+From this list, we want to include the following taxa in our searches:
+
+  * *Bos bison* (and its subspecies, *Bos bison athabascae* and *Bos bison bison*)
+  * uncertainly identified *Bos bison* (cf. *Bos bison*)
+
+That gives us four revised taxon names to match to existing names in Neotoma: 
+
+  1. "Bos bison"
+  2. "Bos bison athabascae"
+  3. "Bos bison bison"
+  4. "cf. Bos bison"
+
+First, we will find the Neotoma names and ids for the revised, correct names. We will save them into two vectors, *bisonNamesNeotoma* and *bisonIDsNeotoma*.
+
+```{r extant_bison}
+# find the Neotoma taxonname and taxonid for these revised names
+revisedNames <- c("Bos bison", "Bos bison athabascae", "Bos bison bison", "cf. Bos bison")
+bisonExtant <- bisonTaxa[match(revisedNames, bisonTaxa$proposedName),] # in this case, there's a one-to-one match but with other taxa it could be more complicated
+
+bisonNamesNeotoma <- bisonExtant$taxonname
+bisonNamesNeotoma
+
+bisonIDsNeotoma <- bisonExtant$taxonid
+bisonIDsNeotoma
+
+```
+
+
+## Find sites in Neotoma that contain *Bos*/*Bison bison* occurrences
+Now that we have our new list of names and their ids, let's use the names to search for sites in Neotoma that have occurrences of these taxa. The neotoma2 R package has a built-in function for finding all sites that contain a taxon, the 'get_taxa' function.
+
+```{r get_taxa}
+bisonSites <- get_taxa(bisonIDsNeotoma, all_data=T)
+length(bisonSites) #551 sites
+bisonDatasets <- datasets(bisonSites)$datasetid 
+length(bisonDatasets) #576 datasets --> some sites have multiple datasets at them.
+```
+
+
+OK, the result is a list of 'datasetids'. We can use this list to download data for all the sites. Since we already have the datasetids, we can go straight to the 'get_downloads' function. *(Note, we could also have done this using the object 'bisonSites'.)*
+```{r search_bison_sites}
+
+# this is the code to get all sites for all taxonids, but it can take a long time to run. So here is an example of what is returned:
+exampleSite <- get_downloads(bisonDatasets[1])
+
+# Instead of doing the download for all sites, we are going to load an object storing the result of the code below that we performed earlier. The code you need to reproduce this is commented out below:
+
+# bisonDownloads <- get_downloads(bisonDatasets, all_data=T)
+# saveRDS(bisonDownloads, file='data/bisonDownloads.rds')
+
+# load the stored RDS file
+bisonDownloads <- readRDS('data/bisonDownloads.rds')
+```
+
+The above code gives us the full dataset for each site. But what we really want are the individual occurrences for each *Bison* species, through time. For example, at a single site *Bison* could have been found within multiple stratigraphic units or just at a single unit. 
+
+The 'neotoma2' R package has a function that allows you to examine all the samples (occurrences) and some associated metadata with one call to 'samples( )'. So let's examine the samples at one of the sites more deeply to see what information is returned with this function:
+```{r examine_samples}
+
+samples(bisonDownloads[1])
+
+```
+There are a lot of different columns that have been returned. Let's examine them in more depth and talk through what each of them means.
+
+  * columns associated with the chronology for the occurrences (age :: chronologyname)
+  * columns associated with the sample/occurrence (units :: ecologicalgroup)
+  * columns associated with the analysis unit/stratigraphic unit (analysisunitid :: samplename)
+  * columns associated with the dataset (datasetid :: datasetnotes)
+  * columns associated with the site (siteid :: elev)
+  * columns associated with the collection unit (collunitid)
+
+**Side note / side question for the group: What is the difference between 'ageolder' and 'age_range_old'?**
+```{r echo=F, results=F}
+# instructor notes: discuss difference in age inferred for a particular sample vs the age range of the whole site
+# 'ageolder' is in the sample table, and so this is the age inferred for this particular occurrence
+# 'age_range_old' is associated with datasets, and so this stores information about the overall age range encompassed by the site
+# for this particular example, there is only one analysis unit at the site and so they are the same
+
+# You can illustrate the difference using the 3rd site, Phipps [13CK21]
+samples(bisonDownloads[3])[,c('ageolder', 'ageyounger', 'age_range_old', 'age_range_young')]
+```
+
+## Make a simple map of *Bison* sites
+
+There is a lot of extra information contained in the 'samples( )' dataframe, but you can see that it returns lat/long as columns so let's use these coordinates to map the sites that contain extant *Bison* occurrences.
+
+### First, we need to install and load more packages.
+```{r install_map_packages}
+# install.packages(c('rnaturalearth', 'sf', 'sfheaders', 'concaveman'))
+
+require(rnaturalearth)
+require(sf)
+require(sfheaders)
+require(concaveman)
+```
+
+### Second, let's get all the base data arranged.
+
+This includes the underlying map of North America, the specific coordinates for *Bison*, and a polygon encompassing all sites. 
+
+```{r gather_map_data_allSites}
+# load North America base map
+na <- ne_countries(continent = "North America", type = "countries", returnclass = "sf")
+
+# generate the coordinates for the Bison sites from the downloads object
+bisonCoords <- coordinates(bisonDownloads)
+
+# find the set of points that define the convex hull
+hull_points <- chull(x=bisonCoords$long, y=bisonCoords$lat)
+hull_points <- bisonCoords[c(hull_points, hull_points[1]),]
+
+# convert the convex hull points into a polygon
+bisonPoly <- st_as_sf(hull_points, coords = c("long", "lat"), crs = 4326) 
+bisonPolygon <- concaveman(bisonPoly)
+```
+
+### Map all *Bison* site occurrences
+Finally, we put it all together on a map.
+```{r make_map_allSites}
+# make the final plot
+ggplot()+ 
+  geom_sf(data = na, col = "black", lwd = 0.3 ) +
+  geom_sf(data=bisonPolygon, col="red", fill=NA) +
+  geom_point(data = bisonCoords, aes(long, lat))
+```
+
+**Questions for the group:**
+
+  1. What improvements could we make to this map? 
+  2. Are there any data that look weird to you?
+  3. Does this map motivate any scientific questions for you?
+
+
+## Map *Bison* occurrences in the Pleistocene vs. the Holocene
+One potential improvement is to map occurrences by different time periods. To do this, we need to know which of these points occurred in the Holocene? In the Pleistocene? 
+
+To really answer this question, we need to dig into the underlying samples and their associated chronologies found within the analysis units at each site.
+
+So, we will next examine all of the samples for each site.  Ultimately, we will create two new dataframes:
+
+  1. sites found in the Pleistocene
+  2. sites in the Holocene.
+
+### Detour into age models/chronologies
+But first we need to think about sample ages and site age models. 
+
+Every site has a set of default chronologies associated with it. Most FAUNMAP sites have a default chronology that is based on radiocarbon ages. There are also updated chronologies for a subset of sites (those with small mammal taxa) that are calibrated. For our purposes, we will just use the default chronologies for a site, ignore any age model issues, and account for the differences in radiocarbon vs calibrated chronologies through filtering. 
+
+*Side note, check out our poster reviewing the scope and current state of vertebrate data in Neotoma during the Friday evening poster session!*
+
+In the plot we made above, we used the data contained in the 'sites' object ('bisonDownloads'). But for this next task, we need to drill down into the individual occurrences, found in 'samples'. So first, let's create a new table that just includes the *Bison* samples. 
+
+But we also need to account for the fact that a site may have both extant and extinct *Bison* species, so we need to also filter out the extinct *Bison* occurrences and just focus on our chosen taxa.
+
+#### Download all individual samples from all sites
+```{r find_Bison_samples}
+# set up a NULL object to store the samples
+bisonSamples <- NULL
+
+# we are going to loop through each dataset in turn, pull out samples, and save just the bison occurrences from the dataset
+for (i in 1:length(bisonDownloads)){
+
+  # for each site, find and temporarily save the samples from that site
+  tempSamples <- samples(bisonDownloads[i])
+  
+  # find the samples that match the names of our focal taxa (stored earlier in the 'bisonNamesNeotoma' object)
+  bisonVars <- na.omit(match(bisonNamesNeotoma, tempSamples$variablename))[1]
+  
+  # filter tempSamples to just those rows
+  bisonSamps <- tempSamples[bisonVars,]
+  
+  # save the samples, but filter down the number of columns here too, to just the most relevant columns
+  bisonSamples <- rbind(bisonSamples, bisonSamps %>% select(siteid, sitename, long, lat, datasetid, analysisunitid, sampleid, taxongroup, taxonid, variablename, units, value, element, ageolder, ageyounger, agetype))
+  
+}
+
+view(bisonSamples)
+```
+
+
+```{r alternate_samples_code}
+# if you want to examine the samples but change the chronology to a different one, you can use this code. You simply add 'chronname = ' to the samples() function. But it's complicated because it requires knowing the chronology name in advance! That's why we're ignoring it for the purposes of this workshop and just using the default chronology.
+
+  # tempSamples <- samples(bisonDownloads[i], chronname = "Syverson-Blois: bounds") 
+```
+
+#### Data cleaning
+Now we have to do some additional data cleaning. 
+
+First, let's eliminate samples that doesn't have any inferred ages. And then check the 'agetypes' of the remaining samples.
+
+```{r check_agetype}
+# filter out samples that have no ages
+bisonSamplesClean <- bisonSamples[-which(is.na(bisonSamples$agetype)),]
+
+# check the agetypes
+unique(bisonSamplesClean$agetype) # there are three different age types represented in the table
+
+```
+
+If we were doing this for research, we may want to also check out some of the spatial outliers.  For example, there are two sites very far north. What are their site names? I might want to take a look at them using Explorer to see if these are real or errors. Code is provided below, but we'll skip this for now so the code is commented out.
+
+```{r check_spatial_outliers} 
+# examine spatial outliers
+
+  # bisonSites[which(coordinates(bisonSites)$lat > 69)]
+
+```
+
+#### Create Pleistocene and Holocene dataframes
+Now, we will create two dataframes: a Holocene *Bison* dataframe and a Pleistocene *Bison* dataframe
+
+For the Holocene, this will correspond to *Bison* samples with:
+  - agetype == Radiocarbon years BP
+  - ageolder < 10000 (and <11,700 for the two other age types). 
+
+We will use the 'ageyounger' field to filter out occurrences that are just in the Pleistocene. Note that there may be some samples that span the boundary and we are not including these samples!
+
+```{r create_holo_pleisto_df}
+
+# find all samples that are 'radiocarbon' years and divide into Holocene and Pleistocene datasets
+tempRC <- bisonSamplesClean[which(bisonSamplesClean$agetype == "Radiocarbon years BP"),]
+bisonHolocene <- tempRC[which(tempRC$ageolder<10000),]
+bisonPleistocene <- tempRC[which(tempRC$ageyounger>10000),]
+
+# find all samples that are 'calendar' years and divide into Holocene and Pleistocene datasets
+tempCalendar <- bisonSamplesClean[which(bisonSamplesClean$agetype == "Calendar years BP"),]
+bisonHolocene <- rbind(bisonHolocene, tempCalendar[which(tempCalendar$ageolder<11700),])
+bisonPleistocene <- rbind(bisonPleistocene, tempCalendar[which(tempCalendar$ageyounger>11700),])
+
+# find all samples that are 'calibrated' years and divide into Holocene and Pleistocene datasets
+tempCalib <- bisonSamplesClean[which(bisonSamplesClean$agetype == "Calibrated radiocarbon years BP"),]
+bisonHolocene <- rbind(bisonHolocene, tempCalib[which(tempCalib$ageolder<11700),])
+bisonPleistocene <- rbind(bisonPleistocene, tempCalib[which(tempCalib$ageyounger>11700),])
+
+```
+
+### Make the final plots
+Now make a new plot that overlays the Pleistocene and Holocene range maps, following the same code from above, but duplicated (once for Pleistocene, once for Holocene).
+```{r plot_holo_pleisto}
+# load the North America base map
+na <- ne_countries(continent = "North America", type = "countries", returnclass = "sf")
+
+# generate points from the bison samples
+holoCoords <- bisonHolocene[,c('long', 'lat')]
+pleistoCoords <- bisonPleistocene[,c('long', 'lat')]
+
+# find set of points that define the convex hull for the Holocene and create polygon
+hull_pointsHolo <- chull(x=holoCoords$long, y=holoCoords$lat)
+hull_pointsHolo <- holoCoords[c(hull_pointsHolo, hull_pointsHolo[1]),]
+
+holoPoly <- st_as_sf(hull_pointsHolo, coords = c("long", "lat"), crs = 4326) 
+holoPolygon <- concaveman(holoPoly)
+
+hull_pointsPleisto <- chull(x=pleistoCoords$long, y=pleistoCoords$lat)
+hull_pointsPleisto <- pleistoCoords[c(hull_pointsPleisto, hull_pointsPleisto[1]),]
+
+pleistoPoly <- st_as_sf(hull_pointsPleisto, coords = c("long", "lat"), crs = 4326) 
+pleistoPolygon <- concaveman(pleistoPoly)
+
+# put all the pieces together into a final plot
+ggplot()+ 
+  geom_sf(data = na, col = "black", lwd = 0.3 ) +
+  geom_sf(data=holoPolygon, col="red", fill=NA) +
+  geom_point(data = holoCoords, aes(long, lat, col="red")) +
+  geom_sf(data=pleistoPolygon, col="blue", fill=NA) +
+  geom_point(data = pleistoCoords, aes(long, lat, col="blue")) +
+  scale_color_identity(name = "Period",
+                          breaks = c("red", "blue"),
+                          labels = c("Holocene", "Pleistocene"),
+                          guide = "legend")
+  
+```
+
+
+Viola! We have created a simple map of *Bison* occurrences in the Pleistocene and the Holocene. 
+
+### Goal 2 wrap up
+Clearly, there is a lot of nuance and subtlety we have missed, that we would need to account for in a research setting. But, this should give you an introduction to how to navigate the vertebrate data in the Neotoma database and provide some example code to get you started.
+
+# Individual play time
+When we come back from lunch, you will have an opportunity to play around. 
+
+  * Did you bring an example problem with you to work on?
+  * If not, can you explore a new site? A new taxon? 
+  * What other functions are provided in the 'neotoma2' package? 
+  * What errors do you encounter along the way (because there WILL be errors!)? 
+  
+Let's have some fun with code! And be prepared to report back on what you did at the end of the day.
+
+
+
