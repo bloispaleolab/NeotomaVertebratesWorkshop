@@ -436,7 +436,10 @@ models/chronologies</a></li>
 <li><a href="#goal-2-wrap-up" id="toc-goal-2-wrap-up"><span class="toc-section-number">6.4.3</span> Goal 2 wrap up</a></li>
 </ul></li>
 </ul></li>
-<li><a href="#individual-play-time" id="toc-individual-play-time"><span class="toc-section-number">7</span> Individual play time</a></li>
+<li><a href="#individual-play-time" id="toc-individual-play-time"><span class="toc-section-number">7</span> Individual play time</a>
+<ul>
+<li><a href="#individual-examples" id="toc-individual-examples"><span class="toc-section-number">7.1</span> Individual examples</a></li>
+</ul></li>
 </ul>
 </div>
 
@@ -1277,6 +1280,24 @@ errors!)?</li>
 </ul>
 <p>Let’s have some fun with code! And be prepared to report back on what
 you did at the end of the day.</p>
+<div id="individual-examples" class="section level2" number="7.1">
+<h2><span class="header-section-number">7.1</span> Individual
+examples</h2>
+<p>During the sandbox time at the SVP 2026 workshop, a few new commands
+were developed that integrate the taxon search into the site search. For
+example, if you know the names of the taxa in advance, you can build
+this information into the ‘get_sites’ command.</p>
+<pre class="r"><code># Search for a single, known taxon
+sfatalisSites &lt;- get_sites(datasettype=&quot;vertebrate fauna&quot;, taxa = &quot;Smilodon fatalis&quot;, all_data=T)
+sfatalisSites
+length(sfatalisSites)
+
+# Search for multiple taxa names
+smiloTaxa &lt;- c(&quot;Smilodon sp.&quot;, &quot;Smilodon&quot;, &quot;Smilodon fatalis&quot;) 
+smiloSites &lt;- get_sites(datasettype=&quot;vertebrate fauna&quot;, taxa = smiloTaxa, all_data=T)
+smiloSites
+length(smiloSites)</code></pre>
+</div>
 </div>
 
 

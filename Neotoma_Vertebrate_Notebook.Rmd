@@ -731,5 +731,25 @@ When we come back from lunch, you will have an opportunity to play around.
   
 Let's have some fun with code! And be prepared to report back on what you did at the end of the day.
 
+## Individual examples
+During the sandbox time at the SVP 2026 workshop, a few new commands were developed that integrate the taxon search into the site search. For example, if you know the names of the taxa in advance, you can build this information into the 'get_sites' command.
+
+```{r sandbox_code}
+
+# Search for a single, known taxon
+sfatalisSites <- get_sites(datasettype="vertebrate fauna", taxa = "Smilodon fatalis", all_data=T)
+sfatalisSites
+length(sfatalisSites)
+
+# Search for multiple taxa names
+smiloTaxa <- c("Smilodon sp.", "Smilodon", "Smilodon fatalis") 
+smiloSites <- get_sites(datasettype="vertebrate fauna", taxa = smiloTaxa, all_data=T)
+smiloSites
+length(smiloSites)
+
+```
+
+
+
 
 
